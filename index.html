@@ -9,7 +9,7 @@
       --bg-color: #f8fafc;
       --card-bg: #ffffff;
       --text-color: #0f172a;
-      --border-color: #e2e8f0;
+      --border-color: #cbd5e1;
       --primary: #2563eb;
       --producer: #16a34a;
       --consumer: #ea580c;
@@ -18,7 +18,7 @@
     }
 
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg-color); color: var(--text-color); }
+    body { font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: var(--bg-color); color: var(--text-color); display: flex; flex-direction: column; min-height: 100vh; }
     
     header { background: #0f172a; color: white; padding: 1rem 2rem; display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 1rem; }
     header h1 { font-size: 1.3rem; font-weight: 700; }
@@ -49,8 +49,8 @@
     #reset-btn { margin-left: auto; background: #475569; color: white; }
     #reset-btn:hover { background: #334155; }
 
-    /* Simulation Area */
-    .simulation-container { position: relative; width: 100%; height: calc(100vh - 270px); min-height: 520px; background: #ffffff; overflow: hidden; }
+    /* Simulation Container */
+    .simulation-container { position: relative; width: 100%; flex: 1; min-height: 480px; background: #ffffff; overflow: hidden; }
     svg#connections { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 1; }
 
     /* Organism Nodes */
@@ -81,14 +81,18 @@
     .node.selected { box-shadow: 0 0 0 4px #60a5fa, 0 10px 20px rgba(0,0,0,0.15); transform: scale(1.05); }
     .node.disabled { opacity: 0.2; filter: grayscale(100%); pointer-events: none; }
 
-    /* Link Styling */
-    line.link { stroke: #16a34a; stroke-width: 3; transition: stroke 0.3s, stroke-width 0.3s; }
-    line.link.decomposer-link { stroke: #a855f7; stroke-dasharray: 4,4; stroke-width: 2.5; }
-    line.link.dimmed { opacity: 0.25; stroke: #94a3b8; }
+    /* Link Groups */
+    .link-group line { stroke-width: 3.5; transition: all 0.3s; }
+    .link-group.green line { stroke: #16a34a; }
+    .link-group.purple line { stroke: #a855f7; stroke-dasharray: 4,4; stroke-width: 3; }
+    .link-group.dimmed line { opacity: 0.15; stroke: #94a3b8; }
 
-    /* Informational Legend Banner */
-    .legend-footer { background: #f1f5f9; padding: 0.5rem 2rem; font-size: 0.8rem; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem; color: #475569; }
-    .legend-item { display: flex; align-items: center; gap: 0.4rem; font-weight: 600; }
+    /* Info Panel for Active Organism Selection */
+    .info-drawer { background: #f8fafc; border-top: 2px solid #e2e8f0; padding: 0.75rem 2rem; display: flex; justify-content: space-between; align-items: center; font-size: 0.85rem; color: #334155; }
+    .info-title { font-weight: 700; color: #0f172a; }
+
+    .legend-footer { background: #0f172a; color: #cbd5e1; padding: 0.6rem 2rem; font-size: 0.8rem; display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+    .legend-item { display: flex; align-items: center; gap: 0.4rem; font-weight: 500; }
     .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
   </style>
 </head>
@@ -109,8 +113,8 @@
   <div class="mission-box">
     <div class="mission-title">📋 Student Investigation Checklist (BIO.1.2)</div>
     <div class="mission-steps">
-      <div class="step-card"><strong>1. Trace Energy:</strong> Click any organism to view connected energy transfers (Arrows = direction of energy flow).</div>
-      <div class="step-card"><strong>2. Model Disruption:</strong> Click "Remove Organisms" buttons to observe how food web changes impact ecosystem balance.</div>
+      <div class="step-card"><strong>1. Trace Energy:</strong> Click any organism circle to highlight energy transfers (Arrows = energy flow direction).</div>
+      <div class="step-card"><strong>2. Model Disruption:</strong> Click buttons under <em>"TEST SPECIES REMOVAL"</em> to observe ecosystem impacts!</div>
       <div class="step-card"><strong>3. Matter Cycling:</strong> Observe how Decomposers recycle nutrients back to Primary Producers!</div>
     </div>
   </div>
@@ -122,7 +126,7 @@
     </div>
 
     <div class="control-group">
-      <span class="control-label">Test Species Removal:</span>
+      <span class="control-label">TEST SPECIES REMOVAL:</span>
       <button class="btn-remove" data-target="algae">🦠 Green Algae</button>
       <button class="btn-remove" data-target="cyanobacteria">🧫 Cyanobacteria</button>
       <button class="btn-remove" data-target="shrimp">🦐 Brine Shrimp</button>
@@ -135,79 +139,82 @@
   <div class="simulation-container" id="container">
     <svg id="connections">
       <defs>
-        <!-- Distinct, High-Visibility Arrowheads -->
-        <marker id="arrow-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-          <path d="M 0 1 L 10 5 L 0 9 z" fill="#16a34a"/>
+        <!-- Custom Arrow Markers with Guaranteed Visibility -->
+        <marker id="arrow-green" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="9" markerHeight="9" orient="auto">
+          <path d="M 0 1 L 12 6 L 0 11 Z" fill="#16a34a"/>
         </marker>
-        <marker id="arrow-purple" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-          <path d="M 0 1 L 10 5 L 0 9 z" fill="#a855f7"/>
+        <marker id="arrow-purple" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="9" markerHeight="9" orient="auto">
+          <path d="M 0 1 L 12 6 L 0 11 Z" fill="#a855f7"/>
         </marker>
-        <marker id="arrow-dimmed" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
-          <path d="M 0 1 L 10 5 L 0 9 z" fill="#94a3b8"/>
+        <marker id="arrow-dimmed" viewBox="0 0 12 12" refX="10" refY="6" markerWidth="9" markerHeight="9" orient="auto">
+          <path d="M 0 1 L 12 6 L 0 11 Z" fill="#94a3b8"/>
         </marker>
       </defs>
     </svg>
 
-    <!-- Organism Nodes -->
-    <div class="node producer" id="algae" style="left: 8%; top: 62%;">
+    <!-- Organism Nodes with Default Spacing -->
+    <div class="node producer" id="algae" style="left: 8%; top: 60%;" data-info="Autotroph using photosynthesis to convert solar energy into chemical energy. Primary food source for Brine Shrimp.">
       <div class="node-icon">🦠</div>
       <h3>Green Algae</h3>
       <span class="role">Producer</span>
     </div>
 
-    <div class="node producer" id="cyanobacteria" style="left: 28%; top: 68%;">
+    <div class="node producer" id="cyanobacteria" style="left: 28%; top: 66%;" data-info="Photosynthetic bacteria forming benthic mats. Main food source for Brine Fly larvae.">
       <div class="node-icon">🧫</div>
       <h3>Cyanobacteria</h3>
       <span class="role">Producer</span>
     </div>
 
-    <div class="node producer" id="plants" style="left: 78%; top: 62%;">
+    <div class="node producer" id="plants" style="left: 78%; top: 60%;" data-info="Wetland vegetation around Great Salt Lake shores. Transfers organic matter to decomposers upon decay.">
       <div class="node-icon">🌿</div>
       <h3>Wetland Plants</h3>
       <span class="role">Producer</span>
     </div>
 
-    <div class="node consumer" id="shrimp" style="left: 18%; top: 36%;">
+    <div class="node consumer" id="shrimp" style="left: 18%; top: 34%;" data-info="Herbivore/Primary Consumer feeding on Green Algae. Key energy source for Wilson's Phalarope.">
       <div class="node-icon">🦐</div>
       <h3>Brine Shrimp</h3>
       <span class="role">Primary Consumer</span>
     </div>
 
-    <div class="node consumer" id="flies" style="left: 42%; top: 42%;">
+    <div class="node consumer" id="flies" style="left: 42%; top: 40%;" data-info="Primary Consumer feeding on Cyanobacteria mats. Essential nutrient source for migratory bird populations.">
       <div class="node-icon">🪰</div>
       <h3>Brine Flies</h3>
       <span class="role">Primary Consumer</span>
     </div>
 
-    <div class="node consumer" id="phalarope" style="left: 45%; top: 10%;">
+    <div class="node consumer" id="phalarope" style="left: 45%; top: 8%;" data-info="Migratory bird feeding heavily on Brine Shrimp and Brine Flies to store energy for migration.">
       <div class="node-icon">🦩</div>
       <h3>Wilson's Phalarope</h3>
       <span class="role">Secondary Consumer</span>
     </div>
 
-    <div class="node apex" id="eagle" style="left: 78%; top: 14%;">
+    <div class="node apex" id="eagle" style="left: 78%; top: 12%;" data-info="Apex Consumer preying on migratory birds. Sits at top of energy pyramid.">
       <div class="node-icon">🦅</div>
       <h3>Golden Eagle</h3>
       <span class="role">Apex Consumer</span>
     </div>
 
-    <div class="node decomposer" id="decomposers" style="left: 8%; top: 10%;">
+    <div class="node decomposer" id="decomposers" style="left: 8%; top: 8%;" data-info="Recycles organic waste and dead organisms back into chemical nutrients for producers (Matter Cycling).">
       <div class="node-icon">🍄</div>
       <h3>Decomposers</h3>
       <span class="role">Nutrient Recycler</span>
     </div>
   </div>
 
+  <div class="info-drawer" id="info-drawer">
+    <div><strong>Selected Species Info:</strong> <span id="info-text">Click any organism node to read its energy role and standard connections.</span></div>
+  </div>
+
   <div class="legend-footer">
     <div class="legend-item"><span class="dot" style="background: var(--producer);"></span> Producers (Autotrophs)</div>
-    <div class="legend-item"><span class="dot" style="background: var(--consumer);"></span> Primary Consumers (Herbivores)</div>
+    <div class="legend-item"><span class="dot" style="background: var(--consumer);"></span> Primary Consumers</div>
     <div class="legend-item"><span class="dot" style="background: var(--apex);"></span> Apex Predators</div>
-    <div class="legend-item"><span class="dot" style="background: var(--decomposer);"></span> Decomposers (Recycles Organic Matter)</div>
-    <div class="legend-item">🟢➡️ Arrow points in direction of <strong>Energy Transfer</strong></div>
+    <div class="legend-item"><span class="dot" style="background: var(--decomposer);"></span> Decomposers (Recycles Matter)</div>
+    <div class="legend-item">🟢➔ Arrow points in direction of <strong>Energy Transfer</strong></div>
   </div>
 
   <script>
-    // Energy Flow Links: [Source (Food), Target (Consumer)]
     const connections = [
       ['algae', 'shrimp'],
       ['cyanobacteria', 'flies'],
@@ -231,36 +238,37 @@
     const nodes = document.querySelectorAll('.node');
 
     function createLinks() {
-      const lines = svg.querySelectorAll('line');
-      lines.forEach(line => line.remove());
+      const existing = svg.querySelectorAll('g.link-group');
+      existing.forEach(g => g.remove());
 
       connections.forEach(([sourceId, targetId]) => {
+        const g = document.createElementNS('http://www.w3.org/2000/svg', 'g');
+        g.classList.add('link-group');
+        g.dataset.source = sourceId;
+        g.dataset.target = targetId;
+
+        const isPurple = sourceId === 'decomposers';
+        g.classList.add(isPurple ? 'purple' : 'green');
+
         const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
-        line.classList.add('link');
-        line.dataset.source = sourceId;
-        line.dataset.target = targetId;
+        line.setAttribute('marker-end', isPurple ? 'url(#arrow-purple)' : 'url(#arrow-green)');
 
-        if (sourceId === 'decomposers') {
-          line.classList.add('decomposer-link');
-          line.setAttribute('marker-end', 'url(#arrow-purple)');
-        } else {
-          line.setAttribute('marker-end', 'url(#arrow-green)');
-        }
-
-        svg.appendChild(line);
+        g.appendChild(line);
+        svg.appendChild(g);
       });
       updateLinks();
     }
 
     function updateLinks() {
       const containerRect = document.getElementById('container').getBoundingClientRect();
-      const nodeRadius = 65; // Half of 130px node width
+      const nodeRadius = 72;
 
-      document.querySelectorAll('line.link').forEach(line => {
-        const source = document.getElementById(line.dataset.source);
-        const target = document.getElementById(line.dataset.target);
+      document.querySelectorAll('g.link-group').forEach(g => {
+        const source = document.getElementById(g.dataset.source);
+        const target = document.getElementById(g.dataset.target);
+        const line = g.querySelector('line');
 
-        if (source && target) {
+        if (source && target && line) {
           const sRect = source.getBoundingClientRect();
           const tRect = target.getBoundingClientRect();
 
@@ -269,45 +277,40 @@
           const tX = tRect.left + tRect.width / 2 - containerRect.left;
           const tY = tRect.top + tRect.height / 2 - containerRect.top;
 
-          // Calculate angle between circles to stop line EXACTLY at edge
           const angle = Math.atan2(tY - sY, tX - sX);
 
-          // Start at edge of source node, end at edge of target node
           const x1 = sX + nodeRadius * Math.cos(angle);
           const y1 = sY + nodeRadius * Math.sin(angle);
-          const x2 = tX - (nodeRadius + 6) * Math.cos(angle); 
-          const y2 = tY - (nodeRadius + 6) * Math.sin(angle);
+          const x2 = tX - nodeRadius * Math.cos(angle);
+          const y2 = tY - nodeRadius * Math.sin(angle);
 
           line.setAttribute('x1', x1);
           line.setAttribute('y1', y1);
           line.setAttribute('x2', x2);
           line.setAttribute('y2', y2);
 
-          // Handle node removal visibility
-          if (removedOrganisms.has(line.dataset.source) || removedOrganisms.has(line.dataset.target)) {
-            line.style.display = 'none';
+          if (removedOrganisms.has(g.dataset.source) || removedOrganisms.has(g.dataset.target)) {
+            g.style.display = 'none';
           } else {
-            line.style.display = energyFlowActive ? 'block' : 'none';
+            g.style.display = energyFlowActive ? 'block' : 'none';
           }
 
-          // Handle click-selection highlighting
           if (selectedNodeId) {
-            if (line.dataset.source === selectedNodeId || line.dataset.target === selectedNodeId) {
-              line.classList.remove('dimmed');
-              line.setAttribute('marker-end', line.dataset.source === 'decomposers' ? 'url(#arrow-purple)' : 'url(#arrow-green)');
+            if (g.dataset.source === selectedNodeId || g.dataset.target === selectedNodeId) {
+              g.classList.remove('dimmed');
+              line.setAttribute('marker-end', g.dataset.source === 'decomposers' ? 'url(#arrow-purple)' : 'url(#arrow-green)');
             } else {
-              line.classList.add('dimmed');
+              g.classList.add('dimmed');
               line.setAttribute('marker-end', 'url(#arrow-dimmed)');
             }
           } else {
-            line.classList.remove('dimmed');
-            line.setAttribute('marker-end', line.dataset.source === 'decomposers' ? 'url(#arrow-purple)' : 'url(#arrow-green)');
+            g.classList.remove('dimmed');
+            line.setAttribute('marker-end', g.dataset.source === 'decomposers' ? 'url(#arrow-purple)' : 'url(#arrow-green)');
           }
         }
       });
     }
 
-    // Node Drag & Drop + Selection
     nodes.forEach(node => {
       let isDragging = false;
       let offsetX, offsetY;
@@ -343,19 +346,21 @@
       });
 
       node.addEventListener('click', () => {
+        const infoText = document.getElementById('info-text');
         if (selectedNodeId === node.id) {
           selectedNodeId = null;
           node.classList.remove('selected');
+          infoText.innerText = 'Click any organism node to read its energy role and standard connections.';
         } else {
           nodes.forEach(n => n.classList.remove('selected'));
           node.classList.add('selected');
           selectedNodeId = node.id;
+          infoText.innerText = node.dataset.info || 'Organism active in food web.';
         }
         updateLinks();
       });
     });
 
-    // Control Toggles
     const toggleEnergyBtn = document.getElementById('toggle-energy');
     toggleEnergyBtn.addEventListener('click', () => {
       energyFlowActive = !energyFlowActive;
@@ -364,7 +369,6 @@
       updateLinks();
     });
 
-    // Species Removal Logic
     document.querySelectorAll('.btn-remove').forEach(btn => {
       btn.addEventListener('click', () => {
         const targetId = btn.dataset.target;
@@ -404,12 +408,12 @@
       }
     }
 
-    // Reset Ecosystem
     document.getElementById('reset-btn').addEventListener('click', () => {
       removedOrganisms.clear();
       selectedNodeId = null;
       nodes.forEach(n => n.classList.remove('disabled', 'selected'));
       document.querySelectorAll('.btn-remove').forEach(b => b.classList.remove('removed'));
+      document.getElementById('info-text').innerText = 'Click any organism node to read its energy role and standard connections.';
       checkEcosystemStatus();
       updateLinks();
     });
