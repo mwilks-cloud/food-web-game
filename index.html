@@ -36,7 +36,7 @@
     .step-card { background: #ffffff; padding: 0.6rem 0.8rem; border-radius: 6px; border: 1px solid #dbeafe; }
 
     /* Controls Panel */
-    .controls-panel { background: var(--card-bg); padding: 0.75rem 2rem; margin-top: 1rem; border-y: 1px solid var(--border-color); display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; }
+    .controls-panel { background: var(--card-bg); padding: 0.75rem 2rem; margin-top: 1rem; display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; border-top: 1px solid #e2e8f0; border-bottom: 1px solid #e2e8f0; }
     .control-group { display: flex; align-items: center; gap: 0.5rem; }
     .control-label { font-size: 0.8rem; font-weight: 700; text-transform: uppercase; color: #64748b; }
 
@@ -81,10 +81,10 @@
     .node.selected { box-shadow: 0 0 0 4px #60a5fa, 0 10px 20px rgba(0,0,0,0.15); transform: scale(1.05); }
     .node.disabled { opacity: 0.2; filter: grayscale(100%); pointer-events: none; }
 
-    /* SVG Link Styling */
-    line.link { stroke: #cbd5e1; stroke-width: 2; stroke-dasharray: 4,4; transition: stroke 0.3s, stroke-width 0.3s; }
-    line.link.active { stroke: #16a34a; stroke-width: 4; stroke-dasharray: none; }
-    line.link.decomposer-link { stroke: #a855f7; stroke-width: 2; stroke-dasharray: 2,4; }
+    /* Link Styling */
+    line.link { stroke: #16a34a; stroke-width: 3; transition: stroke 0.3s, stroke-width 0.3s; }
+    line.link.decomposer-link { stroke: #a855f7; stroke-dasharray: 4,4; stroke-width: 2.5; }
+    line.link.dimmed { opacity: 0.25; stroke: #94a3b8; }
 
     /* Informational Legend Banner */
     .legend-footer { background: #f1f5f9; padding: 0.5rem 2rem; font-size: 0.8rem; border-top: 1px solid var(--border-color); display: flex; justify-content: space-between; flex-wrap: wrap; gap: 1rem; color: #475569; }
@@ -135,19 +135,20 @@
   <div class="simulation-container" id="container">
     <svg id="connections">
       <defs>
-        <marker id="arrow" viewBox="0 0 10 10" refX="26" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-          <path d="M 0 0 L 10 5 L 0 10 z" fill="#cbd5e1"/>
+        <!-- Distinct, High-Visibility Arrowheads -->
+        <marker id="arrow-green" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#16a34a"/>
         </marker>
-        <marker id="arrow-active" viewBox="0 0 10 10" refX="26" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-          <path d="M 0 0 L 10 5 L 0 10 z" fill="#16a34a"/>
+        <marker id="arrow-purple" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#a855f7"/>
         </marker>
-        <marker id="arrow-decomposer" viewBox="0 0 10 10" refX="26" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
-          <path d="M 0 0 L 10 5 L 0 10 z" fill="#a855f7"/>
+        <marker id="arrow-dimmed" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="8" markerHeight="8" orient="auto-start-reverse">
+          <path d="M 0 1 L 10 5 L 0 9 z" fill="#94a3b8"/>
         </marker>
       </defs>
     </svg>
 
-    <!-- Organism Nodes spaced out cleanly -->
+    <!-- Organism Nodes -->
     <div class="node producer" id="algae" style="left: 8%; top: 62%;">
       <div class="node-icon">🦠</div>
       <h3>Green Algae</h3>
@@ -202,7 +203,7 @@
     <div class="legend-item"><span class="dot" style="background: var(--consumer);"></span> Primary Consumers (Herbivores)</div>
     <div class="legend-item"><span class="dot" style="background: var(--apex);"></span> Apex Predators</div>
     <div class="legend-item"><span class="dot" style="background: var(--decomposer);"></span> Decomposers (Recycles Organic Matter)</div>
-    <div class="legend-item">➡️ Arrow points in direction of <strong>Energy Transfer</strong></div>
+    <div class="legend-item">🟢➡️ Arrow points in direction of <strong>Energy Transfer</strong></div>
   </div>
 
   <script>
@@ -218,13 +219,13 @@
       ['flies', 'decomposers'],
       ['phalarope', 'decomposers'],
       ['eagle', 'decomposers'],
-      // Matter cycling back to producers
       ['decomposers', 'algae'],
       ['decomposers', 'cyanobacteria']
     ];
 
     let energyFlowActive = true;
     const removedOrganisms = new Set();
+    let selectedNodeId = null;
 
     const svg = document.getElementById('connections');
     const nodes = document.querySelectorAll('.node');
@@ -241,9 +242,9 @@
 
         if (sourceId === 'decomposers') {
           line.classList.add('decomposer-link');
-          line.setAttribute('marker-end', 'url(#arrow-decomposer)');
+          line.setAttribute('marker-end', 'url(#arrow-purple)');
         } else {
-          line.setAttribute('marker-end', 'url(#arrow)');
+          line.setAttribute('marker-end', 'url(#arrow-green)');
         }
 
         svg.appendChild(line);
@@ -253,6 +254,7 @@
 
     function updateLinks() {
       const containerRect = document.getElementById('container').getBoundingClientRect();
+      const nodeRadius = 65; // Half of 130px node width
 
       document.querySelectorAll('line.link').forEach(line => {
         const source = document.getElementById(line.dataset.source);
@@ -262,20 +264,44 @@
           const sRect = source.getBoundingClientRect();
           const tRect = target.getBoundingClientRect();
 
-          const x1 = sRect.left + sRect.width / 2 - containerRect.left;
-          const y1 = sRect.top + sRect.height / 2 - containerRect.top;
-          const x2 = tRect.left + tRect.width / 2 - containerRect.left;
-          const y2 = tRect.top + tRect.height / 2 - containerRect.top;
+          const sX = sRect.left + sRect.width / 2 - containerRect.left;
+          const sY = sRect.top + sRect.height / 2 - containerRect.top;
+          const tX = tRect.left + tRect.width / 2 - containerRect.left;
+          const tY = tRect.top + tRect.height / 2 - containerRect.top;
+
+          // Calculate angle between circles to stop line EXACTLY at edge
+          const angle = Math.atan2(tY - sY, tX - sX);
+
+          // Start at edge of source node, end at edge of target node
+          const x1 = sX + nodeRadius * Math.cos(angle);
+          const y1 = sY + nodeRadius * Math.sin(angle);
+          const x2 = tX - (nodeRadius + 6) * Math.cos(angle); 
+          const y2 = tY - (nodeRadius + 6) * Math.sin(angle);
 
           line.setAttribute('x1', x1);
           line.setAttribute('y1', y1);
           line.setAttribute('x2', x2);
           line.setAttribute('y2', y2);
 
+          // Handle node removal visibility
           if (removedOrganisms.has(line.dataset.source) || removedOrganisms.has(line.dataset.target)) {
             line.style.display = 'none';
           } else {
             line.style.display = energyFlowActive ? 'block' : 'none';
+          }
+
+          // Handle click-selection highlighting
+          if (selectedNodeId) {
+            if (line.dataset.source === selectedNodeId || line.dataset.target === selectedNodeId) {
+              line.classList.remove('dimmed');
+              line.setAttribute('marker-end', line.dataset.source === 'decomposers' ? 'url(#arrow-purple)' : 'url(#arrow-green)');
+            } else {
+              line.classList.add('dimmed');
+              line.setAttribute('marker-end', 'url(#arrow-dimmed)');
+            }
+          } else {
+            line.classList.remove('dimmed');
+            line.setAttribute('marker-end', line.dataset.source === 'decomposers' ? 'url(#arrow-purple)' : 'url(#arrow-green)');
           }
         }
       });
@@ -317,18 +343,15 @@
       });
 
       node.addEventListener('click', () => {
-        nodes.forEach(n => n.classList.remove('selected'));
-        node.classList.add('selected');
-
-        document.querySelectorAll('line.link').forEach(line => {
-          if (line.dataset.source === node.id || line.dataset.target === node.id) {
-            line.classList.add('active');
-            line.setAttribute('marker-end', 'url(#arrow-active)');
-          } else {
-            line.classList.remove('active');
-            line.setAttribute('marker-end', line.dataset.source === 'decomposers' ? 'url(#arrow-decomposer)' : 'url(#arrow)');
-          }
-        });
+        if (selectedNodeId === node.id) {
+          selectedNodeId = null;
+          node.classList.remove('selected');
+        } else {
+          nodes.forEach(n => n.classList.remove('selected'));
+          node.classList.add('selected');
+          selectedNodeId = node.id;
+        }
+        updateLinks();
       });
     });
 
@@ -384,6 +407,7 @@
     // Reset Ecosystem
     document.getElementById('reset-btn').addEventListener('click', () => {
       removedOrganisms.clear();
+      selectedNodeId = null;
       nodes.forEach(n => n.classList.remove('disabled', 'selected'));
       document.querySelectorAll('.btn-remove').forEach(b => b.classList.remove('removed'));
       checkEcosystemStatus();
