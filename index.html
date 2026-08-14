@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Utah BIO.1.2: Great Salt Lake Food Web Simulation</title>
+  <style>
+    :root {
+      --gsl-blue: #006064; /* Deeper water color */
+      --producer: #c0ca33;
+      --consumer: #ff8f00;
+      --apex: #d32f2f;
+      --bacteria: #7e57c2;
+      --heat-loss: #ffeb3b;
+      --energy-flow: #64ffda; /* Light Cyan glow */
+    }
+
+    body {
+      margin: 0;
+      padding: 0;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background-color: #fafafa;
+      color: #333;
+    }
+
+    header {
+      background-color: var(--gsl-blue);
+      color: white;
+      padding: 10px 20px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 2px 10px rgba(0,0,0,0.2);
+    }
+
+    header h1 { margin: 0; font-size: 1.4rem; }
+    header p { margin: 0; font-size: 0.9rem; opacity: 0.8; }
+
+    #control-panel {
+      padding: 10px 20px;
+      background: white;
+      border-bottom: 1px solid #e0e0e0;
+      display: flex;
+      gap: 15px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .btn {
+      padding: 8px 16px;
+      border: none;
+      border-radius: 4px;
+      cursor: pointer;
+      font-weight: bold;
+      transition: all 0.2s;
+    }
+    
+    .btn-glow { background-color: var(--energy-flow); color: #333; }
+    .btn-disrupt { background-color: var(--apex); color: white; }
+    .btn:hover { opacity: 0.8; transform: translateY(-1px); }
+    
+    #disruption-controls {
+      display: flex;
+      gap: 10px;
+      padding: 10px 20px;
+      background-color: #f5f5f5;
+    }
+    .disrupt-target {
+      padding: 5px 10px;
+      border-radius: 4px;
+      cursor: pointer;
+      border: 1px solid transparent;
+    }
+    .disrupt-target.removed {
+      background-color: #ffcccc;
+      border-color: var(--apex);
+      color: var(--apex);
+      font-weight: bold;
+      text-decoration: line-through;
+    }
+
+    #game-container {
+      flex-grow: 1;
+      position: relative;
+      background-color: #e0f2f1; /* Shallow lake color */
+      overflow: hidden;
+    }
+
+    #web-canvas {
+      width: 100%;
+      height: 100%;
+    }
+
+    .organism {
+      position: absolute;
+      width: 100px;
+      height: 100px;
+      border-radius: 50%;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      text-align: center;
+      padding: 10px;
+      font-size: 0.8rem;
+      font-weight: bold;
+      cursor: pointer;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+      transition: transform 0.2s, box-shadow 0.2s, opacity 0.5s;
+      user-select: none;
+      border: 3px solid;
+    }
+
+    .organism:hover { transform: scale(1.05); box-shadow: 0 6px 12px rgba(0,0,0,0.2); }
+    .organism.selected { transform: scale(1.1); box-shadow: 0 0 15px rgba(100, 255, 218, 0.7); }
+    
+    .organism h3 { margin: 0 0 5px 0; font-size: 0.9rem; }
+    .organism p { margin: 0; font-size: 0.7rem; font-weight: normal; opacity: 0.9; }
+
+    .producer { background: white; border-color: var(--producer); color: var(--producer); }
+    .consumer { background: white; border-color: var(--consumer); color: var(--consumer); }
+    .apex { background: white; border-color: var(--apex); color: var(--apex); }
+    .bacteria { background: white; border-color: var(--bacteria); color: var(--bacteria); }
+    
+    .removed-organism { opacity: 0.1 !important; pointer-events: none; }
+
+    /* Floating energy loss particles */
+    .heat-particle {
+      position: absolute;
+      width: 8px;
+      height: 8px;
+      background-color: var(--heat-loss);
+      border-radius: 50%;
+      opacity: 0.7;
+      pointer-events: none;
+      animation: float-up 3s linear infinite;
+    }
+
+    @keyframes float-up {
+      0% { transform: translateY(0) scale(1); opacity: 0.7; }
+      100% { transform: translateY(-100px) scale(0.5); opacity: 0; }
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <div>
+      <h1>GSL Food Web Tracer</h1>
+      <p>Utah SEEd BIO.1.2: Matter Cycling & Energy Flow</p>
+    </div>
+    <div style="text-align: right;">
+      <p>Sunlight hits: 1,000,000 J</p>
+      <p id="system-state">Status: Normal Ecosystem</p>
+    </div>
+  </header>
+
+  <div id="control-panel">
+    <strong>Controls:</strong>
+    <button id="toggle-tracer" class="btn btn-glow">Toggle Energy Flow</button>
+    <button id="toggle-disruption" class="btn btn-disrupt">Toggle Disruption Mode</button>
+  </div>
+
+  <div id="disruption-controls" style="display:none;">
+    <strong>Click to Remove:</strong>
+    <span class="disrupt-target" data-target="bshrimp">Brine Shrimp</span>
+    <span class="disrupt-target" data-target="algae">Green Algae</span>
+    <span class="disrupt-target" data-target="cyanobacteria">Cyanobacteria</span>
+    <span class="disrupt-target" data-target="flies">Brine Flies</span>
+  </div>
+
+  <div id="game-container">
+    <canvas id="web-canvas"></canvas>
+
+    <!-- PRODUCERS (Top Row) -->
+    <div class="organism producer" id="algae" style="top: 10%; left: 15%;">
+      <h3>Green Algae</h3>
+      <p>(Dunaliella)</p>
+      <p>Photosynthesis</p>
+    </div>
+    <div class="organism producer" id="cyanobacteria" style="top: 10%; left: 45%;">
+      <h3>Cyanobacteria</h3>
+      <p>Benthic Mats</p>
+      <p>Photosynthesis</p>
+    </div>
+    <div class="organism producer" id="plants" style="top: 10%; left: 75%;">
+      <h3>Wetland Plants</h3>
+      <p>Pickleweed/Phragmites</p>
+      <p>Photosynthesis</p>
+    </div>
+
+    <!-- CONSUMERS (Middle Row) -->
+    <div class="organism consumer" id="bshrimp" style="top: 40%; left: 15%;">
+      <h3>Brine Shrimp</h3>
+      <p>(Artemia)</p>
+      <p>Grazer</p>
+    </div>
+    <div class="organism consumer" id="flies" style="top: 40%; left: 45%;">
+      <h3>Brine Flies</h3>
+      <p>(Ephydra)</p>
+      <p>Algal mats</p>
+    </div>
+    <div class="organism consumer" id="phalarope" style="top: 40%; left: 75%;">
+      <h3>Wilson's Phalarope</h3>
+      <p>(Migratory Bird)</p>
+      <p>Insects/Shrimp</p>
+    </div>
+
+    <!-- APEX (Bottom Row) -->
+    <div class="organism apex" id="eagle" style="top: 70%; left: 75%;">
+      <h3>Golden Eagle</h3>
+      <p>Wetland Predator</p>
+    </div>
+
+    <!-- DECOMPOSERS (Bottom Corner) -->
+    <div class="organism bacteria" id="decomposers" style="top: 70%; left: 15%;">
+      <h3>Decomposers</h3>
+      <p>Bacteria/Fungi</p>
+      <p>Recycles Nutrients</p>
+    </div>
+  </div>
+
+  <script>
+    // Food Web Arrow Data: who consumes whom (energy flows FROM consumed TO consumer)
+    // type: 'energy' (one-way), 'cycle' (reciprocal/nutrients), 'heat' (to sky)
+    const relationships = [
+      { from: 'algae', to: 'bshrimp', type: 'energy' },
+      { from: 'cyanobacteria', to: 'bshrimp', type: 'energy' },
+      { from: 'cyanobacteria', to: 'flies', type: 'energy' },
+      { from: 'algae', to: 'flies', type: 'energy' },
+      { from: 'flies', to: 'phalarope', type: 'energy' },
+      { from: 'bshrimp', to: 'phalarope', type: 'energy' },
+      { from: 'plants', to: 'phalarope', type: 'energy' }, // Seed consumption
+      { from: 'phalarope', to: 'eagle', type: 'energy' },
+      
+      // Cycling to Decomposers
+      { from: 'algae', to: 'decomposers', type: 'cycle' },
+      { from: 'cyanobacteria', to: 'decomposers', type: 'cycle' },
+      { from: 'bshrimp', to: 'decomposers', type: 'cycle' },
+      { from: 'flies', to: 'decomposers', type: 'cycle' },
+      { from: 'phalarope', to: 'decomposers', type: 'cycle' },
+      { from: 'eagle', to: 'decomposers', type: 'cycle' },
+      
+      // Nutrient cycling BACK to producers
+      { from: 'decomposers', to: 'algae', type: 'cycle' },
+      { from: 'decomposers', to: 'cyanobacteria', type: 'cycle' },
+      { from: 'decomposers', to: 'plants', type: 'cycle' }
+    ];
+
+    const container = document.getElementById('game-container');
+    const canvas = document.getElementById('web-canvas');
+    const ctx = canvas.getContext('2d');
+    
+    let tracerActive = true;
+    let disruptionMode = false;
+    let removedOrganisms = new Set();
+    let selectedOrganism = null;
+    let energyParticles = [];
+
+    function resizeCanvas() {
+      canvas.width = container.clientWidth;
+      canvas.height = container.clientHeight;
+    }
+
+    function getOrganismCenter(id) {
+      const el = document.getElementById(id);
+      if (!el) return null;
+      return {
+        x: el.offsetLeft + el.offsetWidth / 2,
+        y: el.offsetTop + el.offsetHeight / 2,
+        w: el.offsetWidth,
+        h: el.offsetHeight,
+        isRemoved: removedOrganisms.has(id)
+      };
+    }
+
+    // --- Arrow Drawing ---
+    function drawArrow(fromId, toId, type) {
+      const start = getOrganismCenter(fromId);
+      const end = getOrganismCenter(toId);
+      if (!start || !end || start.isRemoved || end.isRemoved) return;
+
+      const angle = Math.atan2(end.y - start.y, end.x - start.x);
+      
+      // Adjust start/end to be outside the circles
+      const adjustedStart = {
+        x: start.x + Math.cos(angle) * (start.w / 2 + 5),
+        y: start.y + Math.sin(angle) * (start.h / 2 + 5)
+      };
+      const adjustedEnd = {
+        x: end.x - Math.cos(angle) * (end.w / 2 + 10),
+        y: end.y - Math.sin(angle) * (end.h / 2 + 10)
+      };
+
+      ctx.beginPath();
+      ctx.moveTo(adjustedStart.x, adjustedStart.y);
+      ctx.lineTo(adjustedEnd.x, adjustedEnd.y);
+      
+      // Styles
+      if (type === 'energy') {
+        ctx.strokeStyle = '#666'; ctx.lineWidth = 2;
+      } else if (type === 'cycle') {
+        ctx.strokeStyle = '#aaa'; ctx.lineWidth = 1; ctx.setLineDash([5, 5]);
+      }
+
+      ctx.stroke();
+      ctx.setLineDash([]); // Reset
+
+      // Arrowhead
+      const headLen = 12;
+      ctx.beginPath();
+      ctx.moveTo(adjustedEnd.x, adjustedEnd.y);
+      ctx.lineTo(adjustedEnd.x - headLen * Math.cos(angle - Math.PI / 6), adjustedEnd.y - headLen * Math.sin(angle - Math.PI / 6));
+      ctx.lineTo(adjustedEnd.x - headLen * Math.cos(angle + Math.PI / 6), adjustedEnd.y - headLen * Math.sin(angle + Math.PI / 6));
+      ctx.fillStyle = ctx.strokeStyle;
+      ctx.fill();
+    }
+
+    // --- Particle System ---
+    class EnergyParticle {
+      constructor(fromId, toId) {
+        this.start = getOrganismCenter(fromId);
+        this.end = getOrganismCenter(toId);
+        this.progress = 0; // 0 to 1
+        this.speed = 0.005 + Math.random() * 0.005;
+        this.size = 3 + Math.random() * 3;
+      }
+
+      update() {
+        this.progress += this.speed;
+        if (this.progress > 1) { this.progress = 0; } // Loop
+      }
+
+      draw() {
+        if (!this.start || !this.end) return;
+        const x = this.start.x + (this.end.x - this.start.x) * this.progress;
+        const y = this.start.y + (this.end.y - this.start.y) * this.progress;
+        
+        ctx.beginPath();
+        ctx.arc(x, y, this.size, 0, Math.PI * 2);
+        ctx.fillStyle = getComputedStyle(document.documentElement).getPropertyValue('--energy-flow');
+        ctx.shadowBlur = 10;
+        ctx.shadowColor = ctx.fillStyle;
+        ctx.fill();
+        ctx.shadowBlur = 0; // Reset
+      }
+    }
+
+    function createParticles() {
+      energyParticles = [];
+      relationships.forEach(rel => {
+        if (!removedOrganisms.has(rel.from) && !removedOrganisms.has(rel.to)) {
+          for(let i=0; i < 3; i++) { // 3 particles per active relationship
+            energyParticles.push(new EnergyParticle(rel.from, rel.to));
+          }
+        }
+      });
+    }
+
+    // Heat loss particles
+    function spawnHeatParticle(x, y) {
+      const p = document.createElement('div');
+      p.className = 'heat-particle';
+      p.style.left = `${x - 4}px`;
+      p.style.top = `${y - 4}px`;
+      container.appendChild(p);
+      setTimeout(() => p.remove(), 3000); // Match animation duration
+    }
+
+    // --- Main Loop ---
+    function animate() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      
+      relationships.forEach(rel => drawArrow(rel.from, rel.to, rel.type));
+      
+      if (tracerActive) {
+        energyParticles.forEach(p => { p.update(); p.draw(); });
+      }
+
+      requestAnimationFrame(animate);
+    }
+
+    // --- Interaction ---
+    function selectOrganismEl(id) {
+      if (selectedOrganism) document.getElementById(selectedOrganism).classList.remove('selected');
+      
+      if (selectedOrganism === id) { // Deselect
+        selectedOrganism = null;
+      } else {
+        selectedOrganism = id;
+        document.getElementById(id).classList.add('selected');
+      }
+    }
+
+    // --- Disruption System ---
+    function toggleOrganismRemoval(targetId) {
+      const organismEl = document.getElementById(targetId);
+      const controlEl = document.querySelector(`.disrupt-target[data-target="${targetId}"]`);
+      
+      if (removedOrganisms.has(targetId)) {
+        removedOrganisms.delete(targetId);
+        organismEl.classList.remove('removed-organism');
+        controlEl.classList.remove('removed');
+      } else {
+        removedOrganisms.add(targetId);
+        organismEl.classList.add('removed-organism');
+        controlEl.classList.add('removed');
+        
+        // Remove from selection if necessary
+        if(selectedOrganism === targetId) selectOrganismEl(targetId);
+      }
+      
+      createParticles(); // Refresh particles to stop those pathways
+      updateSystemStatus();
+    }
+
+    function updateSystemStatus() {
+      const statusEl = document.getElementById('system-state');
+      const bshrimpRemoved = removedOrganisms.has('bshrimp');
+      const algaeRemoved = removedOrganisms.has('algae');
+      
+      if (bshrimpRemoved && algaeRemoved) {
+        statusEl.textContent = "Status: ECOSYSTEM COLLAPSE. Migratory birds starving. Salt level too high.";
+        statusEl.style.color = var(--apex);
+      } else if (bshrimpRemoved) {
+        statusEl.textContent = "Status: SEVERE DISRUPTION. Algae bloom imminent. Birds losing main food source.";
+        statusEl.style.color = var(--apex);
+      } else if (algaeRemoved) {
+        statusEl.textContent = "Status: PRODUCTION CRASH. Shrimp and flies starvation imminent.";
+        statusEl.style.color = var(--consumer);
+      } else if (removedOrganisms.size > 0) {
+        statusEl.textContent = "Status: Instability detected. Matter cycling inhibited.";
+        statusEl.style.color = var(--consumer);
+      } else {
+        statusEl.textContent = "Status: Normal Ecosystem";
+        statusEl.style.color = 'white';
+      }
+    }
+
+    // --- Init ---
+    window.onload = () => {
+      resizeCanvas();
+      window.addEventListener('resize', resizeCanvas);
+      
+      createParticles();
+      
+      // Set up click interactions for organisms
+      document.querySelectorAll('.organism').forEach(el => {
+        el.onclick = () => selectOrganismEl(el.id);
+      });
+
+      // Heat loss spawning
+      setInterval(() => {
+        document.querySelectorAll('.organism:not(.removed-organism)').forEach(el => {
+          const center = getOrganismCenter(el.id);
+          if (Math.random() > 0.6) { // Random chance to spawn heat
+            spawnHeatParticle(center.x, center.y);
+          }
+        });
+      }, 1000);
+
+      requestAnimationFrame(animate);
+    };
+
+    // --- Buttons ---
+    document.getElementById('toggle-tracer').onclick = () => tracerActive = !tracerActive;
+    
+    document.getElementById('toggle-disruption').onclick = () => {
+      disruptionMode = !disruptionMode;
+      const controls = document.getElementById('disruption-controls');
+      controls.style.display = disruptionMode ? 'flex' : 'none';
+      if (!disruptionMode) {
+        // Clear all removed states if closing disrupt mode
+        removedOrganisms.clear();
+        document.querySelectorAll('.organism').forEach(el => el.classList.remove('removed-organism'));
+        document.querySelectorAll('.disrupt-target').forEach(el => el.classList.remove('removed'));
+        createParticles();
+        updateSystemStatus();
+      }
+    };
+    
+    document.querySelectorAll('.disrupt-target').forEach(el => {
+      el.onclick = () => toggleOrganismRemoval(el.dataset.target);
+    });
+
+  </script>
+</body>
+</html>
